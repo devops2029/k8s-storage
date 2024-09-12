@@ -1,0 +1,56 @@
+To deploy an AWS EBS volume:
+
+Create a StorageClass to map a standard class of storage to the gp2 storage type in AWS EBS:
+
+cat <<EOF | kubectl create -f -
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: standard
+provisioner: kubernetes.io/aws-ebs
+parameters:
+  type: gp2
+reclaimPolicy: Retain
+mountOptions:
+  - debug
+EOF
+Create a PersistentVolumeClaim (PVC) that makes a request for 1Gi of storage from the standard storage class:
+
+cat <<EOF | kubectl create -f -
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: task-pv-claim
+spec:
+  storageClassName: standard
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+EOF
+Deploy a PersistentVolume with the following Pod specification:
+
+cat <<EOF | kubectl create -f -
+kind: Pod
+apiVersion: v1
+metadata:
+  name: task-pv-pod
+spec:
+  volumes:
+    - name: task-pv-storage
+      persistentVolumeClaim:
+       claimName: task-pv-claim
+  containers:
+    - name: task-pv-container
+      image: nginx
+      ports:
+        - containerPort: 80
+          name: "http-server"
+      volumeMounts:
+        - mountPath: "/usr/share/nginx/html"
+          name: task-pv-storage
+EOF
+Verify that the PV is created and bound to the PVC:
+
+kubectl get pv
